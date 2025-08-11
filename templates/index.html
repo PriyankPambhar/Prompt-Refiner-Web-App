@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Refiner Web App</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        /* Use a custom property for the prompt font for easy changes */
+        :root {
+            --prompt-font: "Calibri Light", "Calibri", "Segoe UI", "Roboto", sans-serif;
+        }
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #121212; /* Rich Black */
+            color: #EAEAEA; /* Off-White */
+        }
+        .gradient-text {
+            background: linear-gradient(to right, #FFFFFF, #B0B0B0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .btn-primary {
+            background-color: #FFFFFF;
+            color: #121212;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background-color: #D1D1D1;
+            transform: translateY(-2px);
+        }
+        .btn-primary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: translateY(0);
+        }
+        .btn-secondary {
+            background-color: #282828;
+            color: #EAEAEA;
+            border: 1px solid #444;
+            transition: all 0.3s ease;
+        }
+        .btn-secondary:hover {
+            background-color: #333;
+            border-color: #555;
+        }
+        textarea {
+            background-color: rgba(40, 40, 40, 0.7);
+            border: 1px solid #333333;
+            font-family: var(--prompt-font);
+        }
+        textarea::placeholder { 
+            color: #888888; 
+            font-family: 'Inter', sans-serif;
+        }
+        .loader {
+            width: 48px;
+            height: 48px;
+            border: 5px solid #555;
+            border-bottom-color: #FFFFFF;
+            border-radius: 50%;
+            display: inline-block;
+            box-sizing: border-box;
+            animation: rotation 1s linear infinite;
+        }
+        @keyframes rotation {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .result-section {
+            background-color: #1A1A1A;
+            padding: 1.25rem;
+            border-radius: 0.75rem;
+            margin-top: 1.5rem;
+            border: 1px solid #282828;
+        }
+        .result-section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .result-section-header h4 {
+            font-weight: 700;
+            color: #FFFFFF;
+            font-size: 1.125rem;
+            margin-bottom: 0;
+        }
+        .result-section pre {
+            font-family: var(--prompt-font);
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.6; /* Improved line spacing */
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <header class="py-4 px-4 sm:px-6 lg:px-8">
+        <nav class="flex justify-between items-center max-w-7xl mx-auto">
+            <h1 class="text-2xl font-bold tracking-tight">Prompt<span class="gradient-text">Refiner</span></h1>
+        </nav>
+    </header>
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16">
+        <section class="text-center">
+            <h2 class="text-4xl sm:text-5xl font-extrabold tracking-tight text-white">
+                Transform Your Ideas into <span class="gradient-text">Powerful Prompts</span>
+            </h2>
+            <p class="mt-4 max-w-2xl mx-auto text-lg text-gray-400">
+                Enter a simple topic. Our AI backend will generate, score, and select the best possible prompt for you.
+            </p>
+        </section>
+        <section class="mt-12 sm:mt-16">
+            <div class="flex flex-col">
+                <label for="raw-prompt" class="text-sm font-semibold mb-2 text-gray-300">Enter your topic or instruction</label>
+                <textarea id="raw-prompt" rows="5" class="w-full p-4 rounded-xl text-gray-200 focus:ring-2 focus:ring-gray-400 focus:outline-none transition" placeholder="e.g., a research paper on future medical conditions"></textarea>
+                <button id="refine-btn" class="mt-4 w-full sm:w-auto sm:self-center py-3 px-8 text-black font-bold rounded-lg btn-primary">
+                    Refine Prompt
+                </button>
+            </div>
+            <div class="flex flex-col mt-8">
+                <div id="loader-container" class="text-center hidden">
+                    <div class="loader mx-auto"></div>
+                    <p class="mt-4 text-gray-400">Contacting Gemini... This may take a moment.</p>
+                </div>
+                <div id="output-container" class="w-full h-full"></div>
+            </div>
+        </section>
+    </main>
+    <footer class="mt-20 sm:mt-24 border-t border-gray-800">
+        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
+            <p>&copy; 2025 PromptRefiner. Powered by Flask </p>
+        </div>
+    </footer>
+    <script>
+        const refineBtn = document.getElementById('refine-btn');
+        const rawPromptTextarea = document.getElementById('raw-prompt');
+        const loaderContainer = document.getElementById('loader-container');
+        const outputContainer = document.getElementById('output-container');
+
+        refineBtn.addEventListener('click', handleRefineClick);
+
+        async function handleRefineClick() {
+            const topic = rawPromptTextarea.value.trim();
+            if (!topic) {
+                alert('Please enter a topic or instruction.');
+                return;
+            }
+            refineBtn.disabled = true;
+            refineBtn.textContent = 'Refining...';
+            loaderContainer.classList.remove('hidden');
+            outputContainer.innerHTML = '';
+            try {
+                const response = await fetch('/refine', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ topic: topic })
+                });
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'An unknown error occurred.');
+                }
+                const results = await response.json();
+                renderResults(results);
+            } catch (error) {
+                outputContainer.innerHTML = `<div class="result-section text-red-400"><h4>Error</h4><p>${error.message}</p></div>`;
+            } finally {
+                loaderContainer.classList.add('hidden');
+                refineBtn.disabled = false;
+                refineBtn.textContent = 'Refine Prompt';
+            }
+        }
+        
+        function renderResults({ final_best_prompt, top_5_prompts, scored_prompts }) {
+            const escapeHtml = (unsafe) => unsafe.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            
+            const finalBestHtml = `
+                <div class="result-section">
+                    <div class="result-section-header">
+                        <h4>Final Best Prompt</h4>
+                        <button id="copy-btn" class="py-1 px-3 text-sm font-semibold rounded-md btn-secondary">Copy</button>
+                    </div>
+                    <pre id="final-prompt-text" class="text-gray-200 text-lg">${escapeHtml(final_best_prompt)}</pre>
+                </div>`;
+
+            const top5Html = `
+                <div class="result-section">
+                    <div class="result-section-header"><h4>Top 5 Prompts</h4></div>
+                    <pre class="text-gray-300">${top_5_prompts.map((p, i) => `${i + 1}. ${escapeHtml(p)}`).join('\\n\\n')}</pre>
+                </div>`;
+
+            const scoredHtml = `
+                <div class="result-section">
+                    <div class="result-section-header"><h4>All Scored Prompts (Top 10)</h4></div>
+                    <pre class="text-gray-400">${scored_prompts.map(s => `${s.score} — ${escapeHtml(s.prompt)}`).join('\\n\\n')}</pre>
+                </div>`;
+
+            outputContainer.innerHTML = finalBestHtml + top5Html + scoredHtml;
+
+            // Add event listener for the new copy button
+            const copyBtn = document.getElementById('copy-btn');
+            const finalPromptText = document.getElementById('final-prompt-text').innerText;
+            
+            copyBtn.addEventListener('click', () => {
+                navigator.clipboard.writeText(finalPromptText).then(() => {
+                    copyBtn.textContent = 'Copied!';
+                    setTimeout(() => {
+                        copyBtn.textContent = 'Copy';
+                    }, 2000);
+                }).catch(err => {
+                    console.error('Failed to copy text: ', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
