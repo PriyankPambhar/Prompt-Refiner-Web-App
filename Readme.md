@@ -52,7 +52,7 @@ If you are using Git, clone the repository to your local machine. Otherwise, sim
 2. Create a .env File
 In the root directory of the project, create a file named .env. Open this file and add your Google Gemini API key as follows:
 
-GEMINI_API_KEY=AIzaSyCqIUqX_D5gdEvemsU2EcNSdCakbzc7FxU
+GEMINI_API_KEY="YOUR API KEY"
 
 3. Install Dependencies
 It is recommended to use a virtual environment to keep dependencies isolated.
